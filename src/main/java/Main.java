@@ -17,11 +17,11 @@ public class Main {
         
         // Demonstrate borrowing
         System.out.println("\n=== Borrowing Books ===");
-        library.borrowBook("M001", "978-0134685991", 14, null, null, null, null, false, null, null, null);
+        library.borrowBook(new BorrowRequest("M001", "978-0134685991", 14));
         
         // Demonstrate new member creation during borrowing
-        library.borrowBook("M003", "978-0596009205", 7, "Hassan Malik", "hassan.malik@email.com", 
-                          "5551234567", "789 Johar Town", true, null, null, null);
+        library.borrowBook(new BorrowRequest("M003", "978-0596009205", 7, "Hassan Malik", "hassan.malik@email.com", 
+                          "5551234567", "789 Johar Town", true));
         
         // Demonstrate search functionality
         System.out.println("\n=== Search Results ===");
@@ -86,7 +86,7 @@ public class Main {
         
         // Test 3: Borrowing functionality
         totalTests++;
-        boolean borrowResult = library.borrowBook("TEST001", "TEST001", 14, null, null, null, null, false, null, null, null);
+        boolean borrowResult = library.borrowBook(new BorrowRequest("TEST001", "TEST001", 14));
         if (borrowResult && !testBook.isAvailable()) {
             System.out.println("✓ Test 3 PASSED: Book borrowing");
             passedTests++;

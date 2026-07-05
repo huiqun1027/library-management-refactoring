@@ -1,143 +1,125 @@
 import java.util.*;
-import java.text.SimpleDateFormat;
 
-// CODE SMELL: God Class (Blob) - This class handles too many responsibilities
+// Refactored LibrarySystem: Clean, cohesive, single responsibility delegates.
 public class LibrarySystem {
     private Map<String, Book> books;
     private Map<String, Member> members;
     private List<String> transactionHistory;
-    private Map<String, Double> categoryFines;
-    private Scanner scanner;
-    private SimpleDateFormat dateFormat;
     
     public LibrarySystem() {
         this.books = new HashMap<>();
         this.members = new HashMap<>();
         this.transactionHistory = new ArrayList<>();
-        this.categoryFines = new HashMap<>();
-        this.scanner = new Scanner(System.in);
-        this.dateFormat = new SimpleDateFormat("yyyy-MM-dd");
-        initializeCategoryFines();
     }
     
-    private void initializeCategoryFines() {
-        categoryFines.put("Fiction", 0.5);
-        categoryFines.put("Non-Fiction", 0.75);
-        categoryFines.put("Reference", 1.0);
-        categoryFines.put("Children", 0.25);
-    }
-    
-    // CODE SMELL: Long Method - This method is excessively long and does too much
+    // Backward-compatible overload with 11 parameters
     public boolean borrowBook(String memberId, String isbn, int borrowDays, String memberName, 
-                             String memberEmail, String memberPhone, String memberAddress, 
-                             boolean isNewMember, String bookTitle, String bookAuthor, String bookCategory) {
-        
-        // Validate member exists or create new one
-        Member member = members.get(memberId);
-        if (member == null && isNewMember) {
-            // Create new member with validation
-            if (memberName == null || memberName.trim().length() < 2) {
-                System.out.println("Invalid member name. Must be at least 2 characters.");
-                return false;
-            }
-            if (memberEmail == null || !memberEmail.contains("@") || !memberEmail.contains(".")) {
-                System.out.println("Invalid email format.");
-                return false;
-            }
-            if (memberPhone == null || memberPhone.length() < 10) {
-                System.out.println("Invalid phone number. Must be at least 10 digits.");
-                return false;
-            }
-            if (memberAddress == null || memberAddress.trim().length() < 5) {
-                System.out.println("Invalid address. Must be at least 5 characters.");
-                return false;
-            }
-            
-            member = new Member(memberId, memberName, memberEmail, memberPhone, memberAddress);
-            members.put(memberId, member);
-            System.out.println("New member created: " + memberName);
-        } else if (member == null) {
-            System.out.println("Member not found: " + memberId);
+                              String memberEmail, String memberPhone, String memberAddress, 
+                              boolean isNewMember, String bookTitle, String bookAuthor, String bookCategory) {
+        BorrowRequest request = new BorrowRequest(
+            memberId, isbn, borrowDays, 
+            memberName, memberEmail, memberPhone, memberAddress, isNewMember, 
+            bookTitle, bookAuthor, bookCategory
+        );
+        return borrowBook(request);
+    }
+    
+    // Cleaner refactored borrow method accepting the parameter object
+    public boolean borrowBook(BorrowRequest request) {
+        Member member = resolveOrCreateMember(request);
+        if (member == null) {
             return false;
         }
         
-        // Check member borrowing limits based on membership type and history
-        if (member.getBorrowedBooks().size() >= 5) { // Magic number
-            System.out.println("Member has reached maximum borrowing limit of 5 books.");
+        if (!member.canBorrow()) {
+            if (member.hasReachedBorrowLimit()) {
+                System.out.println("Member has reached maximum borrowing limit of " + Member.MAX_BORROW_LIMIT + " books.");
+            } else if (member.hasOutstandingFinesExceeded()) {
+                System.out.println("Member has outstanding fines exceeding $" + Member.MAX_FINE_LIMIT + ". Cannot borrow.");
+            }
             return false;
         }
         
-        if (member.getTotalFines() > 25.0) { // Magic number
-            System.out.println("Member has outstanding fines exceeding $25.00. Cannot borrow.");
-            return false;
-        }
-        
-        // Validate book exists or create new one
-        Book book = books.get(isbn);
+        Book book = resolveOrCreateBook(request);
         if (book == null) {
-            if (bookTitle != null && bookAuthor != null && bookCategory != null) {
-                book = new Book(isbn, bookTitle, bookAuthor, bookCategory);
-                books.put(isbn, book);
-                System.out.println("New book added to library: " + bookTitle);
-            } else {
-                System.out.println("Book not found and insufficient information to create new book.");
-                return false;
-            }
+            return false;
         }
         
-        // Check if book is available
         if (!book.isAvailable()) {
             System.out.println("Book is currently not available: " + book.getTitle());
-            
-            // Calculate estimated return date based on current borrower
             if (book.getDueDate() != null) {
-                Calendar cal = Calendar.getInstance();
-                cal.setTime(book.getDueDate());
-                System.out.println("Estimated return date: " + dateFormat.format(cal.getTime()));
-                
-                // Check if book is overdue
-                Date today = new Date();
-                if (book.getDueDate().before(today)) {
-                    long overdueDays = (today.getTime() - book.getDueDate().getTime()) / (1000 * 60 * 60 * 24);
-                    double fine = overdueDays * categoryFines.get(book.getCategory());
+                System.out.println("Estimated return date: " + DateUtils.formatDate(book.getDueDate()));
+                if (book.isOverdue()) {
+                    long overdueDays = book.getOverdueDays();
+                    double fine = overdueDays * book.getFineRate();
                     System.out.println("Book is overdue by " + overdueDays + " days. Fine: $" + fine);
                 }
             }
             return false;
         }
         
-        // Calculate due date
-        Calendar cal = Calendar.getInstance();
-        cal.add(Calendar.DAY_OF_MONTH, borrowDays);
-        Date dueDate = cal.getTime();
-        
         // Process the borrowing
+        Date dueDate = DateUtils.calculateDueDate(request.borrowDays);
         book.setAvailable(false);
         book.setDueDate(dueDate);
-        book.setBorrowerMemberId(memberId);
-        member.addBorrowedBook(isbn);
+        book.setBorrowerMemberId(member.getMemberId());
+        member.addBorrowedBook(book.getIsbn());
         
         // Record transaction
-        String transaction = "BORROW: Member " + memberId + " borrowed book " + isbn + 
-                           " (" + book.getTitle() + ") on " + dateFormat.format(new Date()) + 
-                           " due " + dateFormat.format(dueDate);
+        String transaction = "BORROW: Member " + member.getMemberId() + " borrowed book " + book.getIsbn() + 
+                           " (" + book.getTitle() + ") on " + DateUtils.formatDate(new Date()) + 
+                           " due " + DateUtils.formatDate(dueDate);
         transactionHistory.add(transaction);
         
-        // Print confirmation with details
+        printConfirmation(member, book, request.borrowDays, dueDate);
+        
+        return true;
+    }
+    
+    private Member resolveOrCreateMember(BorrowRequest request) {
+        Member member = members.get(request.memberId);
+        if (member == null && request.isNewMember) {
+            if (!Member.validateProfile(request.memberName, request.memberEmail, request.memberPhone, request.memberAddress)) {
+                System.out.println("Invalid member details provided for registration.");
+                return null;
+            }
+            
+            member = new Member(request.memberId, request.memberName, request.memberEmail, request.memberPhone, request.memberAddress);
+            members.put(request.memberId, member);
+            System.out.println("New member created: " + request.memberName);
+        } else if (member == null) {
+            System.out.println("Member not found: " + request.memberId);
+        }
+        return member;
+    }
+    
+    private Book resolveOrCreateBook(BorrowRequest request) {
+        Book book = books.get(request.isbn);
+        if (book == null) {
+            if (request.bookTitle != null && request.bookAuthor != null && request.bookCategory != null) {
+                book = new Book(request.isbn, request.bookTitle, request.bookAuthor, request.bookCategory);
+                books.put(request.isbn, book);
+                System.out.println("New book added to library: " + request.bookTitle);
+            } else {
+                System.out.println("Book not found and insufficient information to create new book.");
+            }
+        }
+        return book;
+    }
+    
+    private void printConfirmation(Member member, Book book, int borrowDays, Date dueDate) {
         System.out.println("=== BORROWING CONFIRMATION ===");
-        System.out.println("Member: " + member.getName() + " (" + memberId + ")");
+        System.out.println("Member: " + member.getName() + " (" + member.getMemberId() + ")");
         System.out.println("Book: " + book.getTitle() + " by " + book.getAuthor());
-        System.out.println("ISBN: " + isbn);
+        System.out.println("ISBN: " + book.getIsbn());
         System.out.println("Category: " + book.getCategory());
-        System.out.println("Borrow Date: " + dateFormat.format(new Date()));
-        System.out.println("Due Date: " + dateFormat.format(dueDate));
+        System.out.println("Borrow Date: " + DateUtils.formatDate(new Date()));
+        System.out.println("Due Date: " + DateUtils.formatDate(dueDate));
         System.out.println("Borrowing Period: " + borrowDays + " days");
-        System.out.println("Daily Fine Rate: $" + categoryFines.get(book.getCategory()));
+        System.out.println("Daily Fine Rate: $" + book.getFineRate());
         System.out.println("Books Currently Borrowed: " + member.getBorrowedBooks().size());
         System.out.println("Total Books Borrowed (Lifetime): " + member.getBorrowCount());
         System.out.println("==============================");
-        
-        return true;
     }
     
     public boolean returnBook(String isbn) {
@@ -153,13 +135,11 @@ public class LibrarySystem {
         }
         
         Member member = members.get(book.getBorrowerMemberId());
-        Date today = new Date();
         double fine = 0.0;
         
-        // Calculate fine if overdue
-        if (book.getDueDate().before(today)) {
-            long overdueDays = (today.getTime() - book.getDueDate().getTime()) / (1000 * 60 * 60 * 24);
-            fine = overdueDays * categoryFines.get(book.getCategory());
+        if (book.isOverdue()) {
+            long overdueDays = book.getOverdueDays();
+            fine = overdueDays * book.getFineRate();
             member.setTotalFines(member.getTotalFines() + fine);
         }
         
@@ -170,7 +150,7 @@ public class LibrarySystem {
         book.setBorrowerMemberId(null);
         
         // Record transaction
-        String transaction = "RETURN: Book " + isbn + " returned on " + dateFormat.format(today) + 
+        String transaction = "RETURN: Book " + isbn + " returned on " + DateUtils.formatDate(new Date()) + 
                            (fine > 0 ? " with fine $" + fine : "");
         transactionHistory.add(transaction);
         

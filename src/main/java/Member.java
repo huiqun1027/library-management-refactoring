@@ -3,6 +3,9 @@ import java.util.List;
 import java.util.Date;
 
 public class Member {
+    public static final int MAX_BORROW_LIMIT = 5;
+    public static final double MAX_FINE_LIMIT = 25.0;
+    
     private String memberId;
     private String name;
     private String email;
@@ -50,6 +53,60 @@ public class Member {
     
     public void removeBorrowedBook(String isbn) {
         borrowedBooks.remove(isbn);
+    }
+
+    public boolean hasReachedBorrowLimit() {
+        return borrowedBooks.size() >= MAX_BORROW_LIMIT;
+    }
+
+    public boolean hasOutstandingFinesExceeded() {
+        return totalFines > MAX_FINE_LIMIT;
+    }
+
+    public boolean canBorrow() {
+        return !hasReachedBorrowLimit() && !hasOutstandingFinesExceeded();
+    }
+
+    public boolean isValid() {
+        return validateProfile(name, email, phoneNumber, address);
+    }
+
+    public static boolean validateProfile(String name, String email, String phone, String address) {
+        if (name == null || name.trim().length() < 2) {
+            return false;
+        }
+        if (email == null || !email.contains("@") || !email.contains(".")) {
+            return false;
+        }
+        if (phone == null || phone.length() < 10) {
+            return false;
+        }
+        if (address == null || address.trim().length() < 5) {
+            return false;
+        }
+        return true;
+    }
+
+    public double calculateRisk() {
+        double risk = 0.0;
+        risk += borrowedBooks.size() * 0.1;
+        risk += totalFines * 0.05;
+        risk += borrowCount * 0.02;
+        
+        if (borrowedBooks.size() > 3) {
+            risk += 1.5;
+        }
+        
+        if (totalFines > 10.0) {
+            risk += 2.0;
+        }
+        
+        long daysSinceMembership = (new Date().getTime() - membershipDate.getTime()) / DateUtils.MILLISECONDS_IN_DAY;
+        if (daysSinceMembership < 30) {
+            risk += 1.0;
+        }
+        
+        return risk;
     }
     
     @Override

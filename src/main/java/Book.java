@@ -32,6 +32,50 @@ public class Book {
     public void setDueDate(Date dueDate) { this.dueDate = dueDate; }
     public void setBorrowerMemberId(String borrowerMemberId) { this.borrowerMemberId = borrowerMemberId; }
     
+    public boolean isOverdue() {
+        return DateUtils.calculateOverdueDays(dueDate) > 0;
+    }
+
+    public long getOverdueDays() {
+        return DateUtils.calculateOverdueDays(dueDate);
+    }
+
+    public double getFineRate() {
+        if ("Reference".equals(category)) {
+            return 1.0;
+        } else if ("Children".equals(category)) {
+            return 0.25;
+        } else if ("Non-Fiction".equals(category)) {
+            return 0.75;
+        }
+        return 0.5; // Default (Fiction, etc.)
+    }
+
+    public String generateReport() {
+        StringBuilder report = new StringBuilder();
+        report.append("=== BOOK REPORT ===\n");
+        report.append("ISBN: ").append(isbn).append("\n");
+        report.append("Title: ").append(title).append("\n");
+        report.append("Author: ").append(author).append("\n");
+        report.append("Category: ").append(category).append("\n");
+        report.append("Available: ").append(isAvailable ? "Yes" : "No").append("\n");
+        
+        if (!isAvailable) {
+            report.append("Borrower: ").append(borrowerMemberId).append("\n");
+            report.append("Due Date: ").append(dueDate).append("\n");
+            
+            if (isOverdue()) {
+                long overdueDays = getOverdueDays();
+                double totalFine = overdueDays * getFineRate();
+                report.append("Overdue Days: ").append(overdueDays).append("\n");
+                report.append("Fine Amount: $").append(totalFine).append("\n");
+            }
+        }
+        
+        report.append("==================\n");
+        return report.toString();
+    }
+
     @Override
     public String toString() {
         return "Book{" +
