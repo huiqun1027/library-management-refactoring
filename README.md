@@ -34,16 +34,24 @@ Assignment 2/
 
 ---
 
-## Code Refactoring Summary
+## Identified Code Smells (Original State)
+1. **God Class (Blob):** The `LibrarySystem` class handled books, members, transaction history, fine rules, and system logic.
+2. **Long Method:** The `borrowBook()` method in `LibrarySystem` was 111 lines long, handling multiple nested responsibilities.
+3. **Long Parameter List:** Methods like `borrowBook()` and `validateMemberForBorrowing()` had 11 parameters in their signatures.
+4. **Duplicate Code:** Dates, overdue computations, and profile field validations were copy-pasted across validator and utility files.
+5. **Magic Numbers:** Literal numbers like `5` (borrow limit) and `25.0` (fine limit) were hardcoded throughout the logic.
+6. **Feature Envy:** `BookUtilities` and `MemberValidator` classes were excessively querying data getters/seters of domain entities.
 
-We refactored the original smelly codebase to apply professional design principles:
+---
 
-1. **God Class (Blob) $\rightarrow$ Cohesive Delegation:** Extracted responsibilities out of `LibrarySystem`. Date arithmetic went to `DateUtils`, risk calculation went to `Member`, and reporting went to `Book`.
-2. **Long Method $\rightarrow$ Extract Method:** Split the 111-line `borrowBook` method into dedicated private helpers (`resolveOrCreateMember`, `resolveOrCreateBook`, `printConfirmation`).
-3. **Long Parameter List $\rightarrow$ Parameter Object:** Introduced `BorrowRequest` to bundle the 11 borrow arguments, simplifying the signature of `LibrarySystem.borrowBook()`.
-4. **Duplicate Code $\rightarrow$ Centralized Utilities:** Moved redundant profile checks to `Member.validateProfile()` and repeated date-millisecond math to `DateUtils.calculateOverdueDays()`.
-5. **Magic Numbers $\rightarrow$ Named Constants:** Replaced hardcoded values with clear static constants (e.g., `MAX_BORROW_LIMIT = 5` and `MAX_FINE_LIMIT = 25.0`).
-6. **Feature Envy $\rightarrow$ Tell, Don't Ask:** Moved `generateBookReport()` to `Book.java` and `calculateMemberRisk()` to `Member.java` so that behavior sits with the data it operates on.
+## Code Refactoring Summary (Clean State)
+We refactored the original smelly codebase to apply clean design principles:
+1. **God Class $\rightarrow$ Cohesive Delegation:** Responsibilities were moved from `LibrarySystem` into `DateUtils`, `Member`, and `Book`.
+2. **Long Method $\rightarrow$ Extract Method:** Split `borrowBook()` into small, cohesive helpers (`resolveOrCreateMember()`, `resolveOrCreateBook()`, `printConfirmation()`).
+3. **Long Parameter List $\rightarrow$ Parameter Object:** Introduced `BorrowRequest` to wrap the 11 parameters in a clean object container.
+4. **Duplicate Code $\rightarrow$ Centralized Utilities:** Extracted duplicated calculations to `DateUtils` and profile checks to static `Member.validateProfile()`.
+5. **Magic Numbers $\rightarrow$ Named Constants:** Replaced hardcoded values with descriptive constants (`MAX_BORROW_LIMIT = 5`, `MAX_FINE_LIMIT = 25.0`).
+6. **Feature Envy $\rightarrow$ Tell, Don't Ask:** Moved `generateReport()` into `Book.java` and `calculateRisk()` into `Member.java` so behavior sits with the data it uses.
 
 ---
 
